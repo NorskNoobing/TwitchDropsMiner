@@ -1,6 +1,6 @@
 # Twitch Drops Miner (for Docker)
 
-This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle. This is a fork of https://github.com/DevilXD/TwitchDropsMiner meant to be run inside Docker. It also only builds the AppImage for linux, for that reason.
+This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle. This is a fork of https://github.com/DevilXD/TwitchDropsMiner meant to be run inside Docker. It also only builds the Pyinstaller for linux, for that reason.
 
 ### Docker Fork Modifications:
 This fork has been specifically modified for Docker deployment with the following key changes:
