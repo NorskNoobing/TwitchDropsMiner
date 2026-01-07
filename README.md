@@ -13,6 +13,9 @@ This fork has been specifically modified for Docker deployment with the followin
 - **Login URL management** - Login URLs are copied to clipboard
 - **About tab links** - Repository URL updated in about tab
 
+> [!NOTE]
+> Symbola font is needed to render the arrows on the settings page. The buttons use very rare unicode characters and most fonts do not have them.
+
 > [!WARNING]
 > Anything below this point is for running the application normally, NOT in docker. Go to https://github.com/fireph/docker-twitch-drops-miner to learn about how to run it in Docker. DO NOT report any Docker issues to https://github.com/DevilXD/TwitchDropsMiner!
 
