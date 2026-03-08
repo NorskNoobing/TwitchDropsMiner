@@ -108,6 +108,7 @@ jobs:
           path: Twitch.Drops.Miner.Windows.zip
 
   macos:
+    if: false
     name: macOS
     runs-on: macos-latest
     needs:
