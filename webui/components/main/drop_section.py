@@ -30,9 +30,11 @@ class DropSection:
         self._drop_percentage_text: str = "-%"
         self._drop_remaining_text: str = ""
 
-        app.timer(1.0, self.tick)
+        self._timer = None
 
     def build(self) -> None:
+        if self._timer is None:
+            self._timer = app.timer(1.0, self.tick)
         with ui.card().props("flat bordered").classes("w-full gap-1"):
             ui.label(_("gui", "progress", "name")).classes("font-bold text-sm mb-1")
             with ui.grid(columns=2).classes("w-full text-xs gap-1"):

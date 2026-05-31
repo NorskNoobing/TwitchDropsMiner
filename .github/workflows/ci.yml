@@ -63,7 +63,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest tests/ -x
+          python -m pytest tests/ webui/tests/ -x
 
   windows:
     if: false
