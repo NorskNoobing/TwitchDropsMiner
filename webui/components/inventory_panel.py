@@ -255,9 +255,9 @@ class InventoryPanel(BasePanel):
             "gui",
             "inventory",
             "status",
-            "linked" if campaign.eligible else "not_linked",
+            "linked" if campaign.linked else "not_linked",
         )
-        link_cls = "text-green-500" if campaign.eligible else "text-red-500"
+        link_cls = "text-green-500" if campaign.linked else "text-red-500"
 
         # Allowed channels
         acl = campaign.allowed_channels
