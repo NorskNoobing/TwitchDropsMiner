@@ -1,4 +1,5 @@
-"""WebUI-only monkey-patches that extend core classes without editing them.
+"""
+WebUI-only monkey-patches that extend core classes without editing them.
 
 Imported once from ``main_webui.py`` after the core modules are loaded, so the
 fork keeps its diff against upstream minimal.
@@ -8,6 +9,8 @@ from __future__ import annotations
 
 import settings as _settings
 import inventory as _inventory
+
+import webui.translations  # noqa
 
 _settings.default_settings["priority_link_override"] = False  # type: ignore[typeddict-unknown-key]
 

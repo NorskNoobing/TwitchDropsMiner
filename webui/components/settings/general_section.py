@@ -37,7 +37,9 @@ class GeneralSection:
                 )
 
                 with ui.row().classes("items-center gap-2 text-xs"):
-                    ui.label("Language:").classes("flex-1")
+                    ui.label(_("webui", "settings", "general", "language")).classes(
+                        "flex-1"
+                    )
                 ui.select(
                     options=list(_.languages),
                     value=_.current,
@@ -82,7 +84,7 @@ class GeneralSection:
                     placeholder="http://username:password@address:port",
                     on_change=lambda e: self._on_proxy_change(e.value),
                     validation=lambda v: (
-                        "Invalid proxy URL"
+                        _("webui", "settings", "general", "invalid_proxy")
                         if not GeneralSection._proxy_is_valid(v)
                         else None
                     ),
@@ -124,9 +126,9 @@ class GeneralSection:
                     ).bind_value_from(settings, "available_drops_check")
 
                 with ui.row().classes("items-center gap-2 text-xs"):
-                    ui.label("Mine unlinked games from the Priority List: ").classes(
-                        "flex-1"
-                    )
+                    ui.label(
+                        _("webui", "settings", "advanced", "priority_link_override")
+                    ).classes("flex-1")
                     ui.switch(
                         value=settings.priority_link_override,
                         on_change=lambda e: GeneralSection._set_and_save(

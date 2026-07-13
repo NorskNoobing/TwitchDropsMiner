@@ -132,7 +132,7 @@ class InventoryPanel(BasePanel):
 
         with ui.column().classes("w-full gap-2"):
             if not campaigns:
-                ui.label("No campaigns match the current filters.").classes(
+                ui.label(_("webui", "inventory", "no_campaigns")).classes(
                     "text-sm text-gray-500 p-4"
                 )
                 return
