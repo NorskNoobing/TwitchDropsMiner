@@ -3,16 +3,38 @@
 Verifies that fork-specific translation keys are merged into the Translator
 and that language switching with webui/lang/<language>.json overrides works
 without corrupting default_translation.
+
+Expected values are read from the source-of-truth files (the Python dict and
+the JSON language files) — not hardcoded — so the tests stay valid when
+translations change.
 """
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from typing import Any
 
 import pytest
 
 import webui.translations  # noqa: side effects
 from translate import _, default_translation
+from webui.translations import default_webui_translation
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+WEBUI_LANG_DIR = PROJECT_ROOT / "webui" / "lang"
+
+
+def _flatten(d: dict[str, Any], prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], str]]:
+    """Yield (path, value) for every leaf in a nested dict."""
+    result: list[tuple[tuple[str, ...], str]] = []
+    for k, v in d.items():
+        path = prefix + (k,)
+        if isinstance(v, dict):
+            result.extend(_flatten(v, path))
+        else:
+            result.append((path, v))
+    return result
 
 
 @pytest.fixture
@@ -22,68 +44,72 @@ def restore_english():
     _.set_language("English")
 
 
+@pytest.fixture
+def deutsch_override(tmp_path, monkeypatch):
+    """Point the webui lang dir at a temp dir with a partial Deutsch override."""
+    import webui.translations as wt
+
+    monkeypatch.setattr(wt, "_WEBUI_LANG_DIR", tmp_path)
+    (tmp_path / "Deutsch.json").write_text(
+        json.dumps({"webui": {"help": {"about": "Über"}}}),
+        encoding="utf-8",
+    )
+
+
+# ---------------------------------------------------------------------------
+# English keys from the Python dict (source of truth)
+# ---------------------------------------------------------------------------
+
+_ENGLISH_KEYS = _flatten(default_webui_translation)
+
+
 @pytest.mark.parametrize(
     "path,expected",
-    [
-        (("webui", "help", "about"), "About"),
-        (("webui", "login", "logout"), "Logout"),
-        (("webui", "status", "name"), "Status:"),
-        (
-            ("webui", "settings", "advanced", "priority_link_override"),
-            "Mine unlinked games from the Priority List: ",
-        ),
-        (("webui", "auth", "username"), "Username"),
-        (("webui", "inventory", "no_campaigns"), "No campaigns match the current filters."),
-        (("webui", "game_list", "cancel"), "Cancel"),
-    ],
-    ids=lambda p: ".".join(p) if isinstance(p, tuple) else str(p),
+    _ENGLISH_KEYS,
+    ids=[".".join(p) for p, _ in _ENGLISH_KEYS],
 )
 def test_webui_key(path: tuple[str, ...], expected: str):
-    """Fork keys are merged into the live Translator at import time."""
+    """Fork keys from the Python dict are merged into the live Translator."""
     assert _(*path) == expected
 
 
+# ---------------------------------------------------------------------------
+# Language files: every key in each JSON resolves via _()
+# ---------------------------------------------------------------------------
+
+_LANG_FILES = sorted(WEBUI_LANG_DIR.glob("*.json"))
+
+
 @pytest.mark.usefixtures("restore_english")
 @pytest.mark.parametrize(
-    "language",
-    ["Deutsch", "Français", "Polski"],
+    "lang_file",
+    _LANG_FILES,
+    ids=[f.stem for f in _LANG_FILES],
 )
-def test_webui_keys_fallback_without_override(language: str):
-    """Fork keys fall back to English when the language has no webui/lang/ file."""
-    _.set_language(language)
-    assert _("webui", "help", "about") == "About"
-    assert _("webui", "login", "logout") == "Logout"
-    assert _("webui", "status", "name") == "Status:"
+def test_webui_keys_match_language_file(lang_file: Path):
+    """Every key in webui/lang/<language>.json resolves via _() on switch."""
+    data = json.loads(lang_file.read_text(encoding="utf-8"))
+    _.set_language(lang_file.stem)
+    for path, expected in _flatten(data):
+        assert _(*path) == expected, f"{'.'.join(path)} in {lang_file.name}"
 
 
-@pytest.mark.usefixtures("restore_english")
-def test_override_applied_on_language_switch(tmp_path, monkeypatch):
-    """A webui/lang/<language>.json override is applied on set_language."""
-    import webui.translations as wt
+# ---------------------------------------------------------------------------
+# Partial override: overridden keys use the file, others fall back to English
+# ---------------------------------------------------------------------------
 
-    monkeypatch.setattr(wt, "_WEBUI_LANG_DIR", tmp_path)
-    (tmp_path / "Deutsch.json").write_text(
-        json.dumps({"webui": {"help": {"about": "Über"}}}),
-        encoding="utf-8",
-    )
 
+@pytest.mark.usefixtures("restore_english", "deutsch_override")
+def test_partial_override_and_fallback():
+    """A partial webui/lang/ override applies its keys; others fall back."""
     _.set_language("Deutsch")
     assert _("webui", "help", "about") == "Über"
-    # Non-overridden keys still fall back to English
     assert _("webui", "login", "logout") == "Logout"
 
 
-@pytest.mark.usefixtures("restore_english")
-def test_override_doesnt_corrupt_default_translation(tmp_path, monkeypatch):
+@pytest.mark.usefixtures("restore_english", "deutsch_override")
+def test_override_doesnt_corrupt_default_translation():
     """A non-English webui/lang/ override must not mutate default_translation."""
-    import webui.translations as wt
-
-    monkeypatch.setattr(wt, "_WEBUI_LANG_DIR", tmp_path)
-    (tmp_path / "Deutsch.json").write_text(
-        json.dumps({"webui": {"help": {"about": "Über"}}}),
-        encoding="utf-8",
-    )
-
     assert default_translation["webui"]["help"]["about"] == "About"
 
     _.set_language("Deutsch")
