@@ -110,6 +110,18 @@ else:
 #     )
 #     binaries.append((libraries_path / "libayatana-appindicator3.so.1", "."))
 
+#     hiddenimports.extend([
+#         "gi.repository.Gtk",
+#         "gi.repository.GObject",
+#     ])
+#     hooksconfig = {
+#         "gi": {
+#             "icons": [],
+#             "themes": [],
+#             "languages": ["en_US"]
+#         }
+#     }
+
 a = Analysis(
     [entry_script],
     datas=datas,
