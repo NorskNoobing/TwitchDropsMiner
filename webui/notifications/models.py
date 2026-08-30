@@ -50,7 +50,7 @@ class NotificationEvent:
     def from_claimed_drop(cls, drop) -> "NotificationEvent":
         campaign = drop.campaign
         benefits = tuple(
-            BenefitInfo(name=benefit.name, image_url=str(benefit.image_url))
+            BenefitInfo(name=benefit.name, image_url=str(benefit.image_url or ""))
             for benefit in drop.benefits
         ) or (BenefitInfo(name=drop.name),)
         return cls(
@@ -65,7 +65,7 @@ class NotificationEvent:
             campaign_name=campaign.name,
             claimed_drops=campaign.claimed_drops,
             total_drops=campaign.total_drops,
-            game_image_url=str(campaign.image_url),
+            game_image_url=str(campaign.image_url or ""),
             benefits=benefits,
         )
 
@@ -81,7 +81,7 @@ class NotificationEvent:
             campaign_name=campaign.name,
             claimed_drops=campaign.claimed_drops,
             total_drops=campaign.total_drops,
-            game_image_url=str(campaign.image_url),
+            game_image_url=str(campaign.image_url or ""),
         )
 
     @classmethod

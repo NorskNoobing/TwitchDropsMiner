@@ -14,6 +14,11 @@ from constants import CONFIG_PATH
 from .models import DEFAULT_EVENT_TYPES, NotificationEventType
 
 
+CONFIG_VERSION = 2
+DEFAULT_DISCORD_COLOR = 0x237FEB
+LEGACY_DEFAULT_DISCORD_COLOR = 0x7D46FF
+
+
 @dataclass
 class NotificationDestination:
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
@@ -25,7 +30,7 @@ class NotificationDestination:
     )
     url: str = ""
     bot_name: str = "Twitch Drops Miner"
-    color: int = 0x7D46FF
+    color: int = DEFAULT_DISCORD_COLOR
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_security: str = "starttls"
@@ -100,12 +105,23 @@ class NotificationConfig:
                 NotificationDestination.from_dict(item)
                 for item in data.get("destinations", [])
             ]
+            if int(data.get("version", 1)) < CONFIG_VERSION:
+                for destination in self.destinations:
+                    if (
+                        destination.provider == "discord"
+                        and destination.color == LEGACY_DEFAULT_DISCORD_COLOR
+                    ):
+                        destination.color = DEFAULT_DISCORD_COLOR
+                self.save()
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
             self.load_error = f"Unable to load notification settings: {exc}"
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"version": 1, "destinations": [asdict(item) for item in self.destinations]}
+        payload = {
+            "version": CONFIG_VERSION,
+            "destinations": [asdict(item) for item in self.destinations],
+        }
         handle, temporary_name = tempfile.mkstemp(
             dir=self.path.parent, prefix=".notifications-", suffix=".json"
         )

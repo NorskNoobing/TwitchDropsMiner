@@ -4,7 +4,7 @@ This application allows you to AFK mine timed Twitch drops, without having to wo
 
 ## Integrated notifications
 
-The WebUI includes a Notifications tab with multiple destinations, per-event controls, test delivery, and recent delivery status. Discord destinations receive rich embeds containing campaign progress, game artwork, and one embed per claimed benefit. Email and advanced destinations use [Apprise](https://github.com/caronc/apprise), allowing the miner to support many notification services without another container.
+The WebUI includes a Notifications tab with multiple destinations, per-event controls, test delivery, and recent delivery status. Discord destinations receive rich embeds containing campaign progress, game artwork, and one embed per claimed benefit. Their default identity is Twitch Drops Miner with the project logo and a `#237feb` embed color. Test deliveries use artwork from a currently loaded campaign so they exercise the same Twitch image data as real claims. Email and advanced destinations use [Apprise](https://github.com/caronc/apprise), allowing the miner to support many notification services without another container.
 
 Notification credentials are stored in `config/notifications.json`. The application writes this file with owner-only permissions and redacts destination credentials from delivery errors.
 

@@ -11,7 +11,7 @@ import apprise
 
 from .config import NotificationConfig, NotificationDestination
 from .discord import send_discord
-from .models import BenefitInfo, DeliveryAttempt, NotificationEvent, NotificationEventType
+from .models import DeliveryAttempt, NotificationEvent, NotificationEventType
 
 logger = logging.getLogger("TwitchDropsNotifications")
 
@@ -171,32 +171,28 @@ class NotificationService:
                 detail = detail.replace(secret, "[redacted]")
         return detail[:300]
 
-    def send_test(self, destination_id: str) -> None:
+    def send_test(self, destination_id: str, inventory) -> bool:
         destination = self.config.get(destination_id)
-        test_event = NotificationEvent(
-            event_type=NotificationEventType.DROP_CLAIMED,
-            title="Claimed drop: THE FINALS (5/5)",
-            message="Greenroom Glitch 93R",
-            deduplication_key=f"test:{destination_id}:{datetime.now().timestamp()}",
-            game_name="THE FINALS",
-            campaign_name="Seasonal Drops Campaign",
-            claimed_drops=5,
-            total_drops=5,
-            game_image_url="https://static-cdn.jtvnw.net/ttv-boxart/1919303692-285x380.jpg",
-            benefits=(
-                BenefitInfo(
-                    "Greenroom Glitch 93R",
-                    "https://raw.githubusercontent.com/DevilXD/TwitchDropsMiner/master/appimage/pickaxe.png",
-                ),
+        sample_drop = next(
+            (
+                drop
+                for campaign in inventory
+                for drop in campaign.drops
+                if drop.benefits
             ),
+            None,
         )
+        if sample_drop is None:
+            return False
+        test_event = NotificationEvent.from_claimed_drop(sample_drop)
         try:
             task = asyncio.create_task(self._send_test(test_event, destination))
         except RuntimeError:
             logger.warning("Test notification skipped because no event loop is running")
-            return
+            return False
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+        return True
 
     async def _send_test(
         self, event: NotificationEvent, destination: NotificationDestination

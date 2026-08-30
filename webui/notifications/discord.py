@@ -8,6 +8,12 @@ from .config import NotificationDestination
 from .models import NotificationEvent
 
 
+TDM_AVATAR_URL = (
+    "https://raw.githubusercontent.com/fireph/TwitchDropsMiner/"
+    "webui/appimage/pickaxe.png"
+)
+
+
 def build_discord_payload(
     event: NotificationEvent, destination: NotificationDestination
 ) -> dict:
@@ -44,7 +50,11 @@ def build_discord_payload(
         if event.game_image_url:
             embed["thumbnail"] = {"url": event.game_image_url}
         embeds = [embed]
-    return {"username": destination.bot_name, "embeds": embeds}
+    return {
+        "username": destination.bot_name,
+        "avatar_url": TDM_AVATAR_URL,
+        "embeds": embeds,
+    }
 
 
 async def send_discord(

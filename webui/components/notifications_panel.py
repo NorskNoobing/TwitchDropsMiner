@@ -255,8 +255,16 @@ class NotificationsPanel(BasePanel):
         self._config.save()
 
     def _test(self, destination: NotificationDestination) -> None:
-        self._manager.notification_service.send_test(destination.id)
-        ui.notify(_("webui", "notifications", "test_queued"), type="positive")
+        queued = self._manager.notification_service.send_test(
+            destination.id, self._manager._twitch.inventory
+        )
+        if queued:
+            ui.notify(_("webui", "notifications", "test_queued"), type="positive")
+        else:
+            ui.notify(
+                "No campaign with benefit artwork is currently loaded.",
+                type="warning",
+            )
 
     def _delete(self, destination: NotificationDestination) -> None:
         self._config.remove(destination.id)
