@@ -8,7 +8,6 @@ on:
 permissions:
   actions: write
   contents: write
-  pull-requests: write
 
 concurrency:
   group: upstream-release-sync
@@ -89,22 +88,14 @@ jobs:
       - name: Smoke-build synchronized container
         if: steps.check.outputs.changed == 'true'
         run: docker buildx build --platform linux/amd64 --load -t twitch-drops-miner:sync-test .
-      - name: Create and merge synchronization pull request
+      - name: Publish verified synchronization
         if: steps.check.outputs.changed == 'true'
         id: merge
         shell: bash
         run: |
-          branch="automation/upstream-${{ steps.upstream.outputs.version }}"
-          git checkout -b "$branch"
           git add .github/upstream-release.json
           git commit -m "Sync upstream release ${{ steps.upstream.outputs.version }}"
-          git push --force-with-lease origin "$branch"
-          url=$(gh pr create \
-            --base webui \
-            --head "$branch" \
-            --title "Sync upstream release ${{ steps.upstream.outputs.version }}" \
-            --body "Automated, tested synchronization to fireph/TwitchDropsMiner@${{ steps.upstream.outputs.commit }}.")
-          gh pr merge "$url" --merge --delete-branch
+          git push origin HEAD:webui
           version="${{ steps.upstream.outputs.version }}-notify.1"
           gh release create "$version" --target webui --generate-notes --title "v$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
