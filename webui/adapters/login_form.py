@@ -42,10 +42,20 @@ class LoginFormAdapter:
 
     async def ask_enter_code(self, page_url: "URL", user_code: str) -> None:
         """Show the login button and wait for the user to click it before polling begins."""
+        from webui.notifications import NotificationEvent, NotificationEventType
+
         self.page_url = page_url
         self.update(_("gui", "login", "required"), None)
         self._manager.grab_attention(sound=False)
         self._manager.print(_("gui", "login", "request"))
+        self._manager.notification_service.queue(
+            NotificationEvent.simple(
+                NotificationEventType.LOGIN_REQUIRED,
+                "Twitch login required",
+                "Open Twitch Drops Miner and complete the device login.",
+                str(page_url),
+            )
+        )
         await self.wait_for_login_press()
 
     def confirm(self) -> None:

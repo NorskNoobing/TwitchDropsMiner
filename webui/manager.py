@@ -65,7 +65,9 @@ from .components import (
     HelpPanel,
     SettingsPanel,
     HeaderBar,
+    NotificationsPanel,
 )
+from .notifications import NotificationEvent, NotificationEventType, NotificationService
 
 if TYPE_CHECKING:
     from twitch import Twitch
@@ -95,6 +97,8 @@ class WebUIManager:
         self._close_requested = asyncio.Event()
         self._reload_requested = asyncio.Event()
         self._running = False
+        self._last_mining_drop_id: str | None = None
+        self.notification_service = NotificationService()
 
         # Shared UI state
         self._current_icon: str = "pickaxe"
@@ -118,6 +122,7 @@ class WebUIManager:
         self.main_panel: MainPanel = MainPanel(self)
         self.inventory_panel: BasePanel = InventoryPanel(self)
         self.settings_panel: BasePanel = SettingsPanel(self)
+        self.notifications_panel: BasePanel = NotificationsPanel(self)
         self.help_panel: BasePanel = HelpPanel(self)
 
         self._setup_ui()
@@ -172,7 +177,9 @@ class WebUIManager:
 
             # Fall back to 'main' if the ?tab= query param is not a known tab name.
             initial_tab = (
-                tab if tab in ("main", "inventory", "settings", "help") else "main"
+                tab
+                if tab in ("main", "inventory", "settings", "notifications", "help")
+                else "main"
             )
 
             def _on_tab_change(e):
@@ -190,6 +197,9 @@ class WebUIManager:
 
                 with ui.tab_panel("settings"):
                     manager.settings_panel.build()
+
+                with ui.tab_panel("notifications"):
+                    manager.notifications_panel.build()
 
                 with ui.tab_panel("help"):
                     manager.help_panel.build()
@@ -231,6 +241,16 @@ class WebUIManager:
 
         self.main_panel.push_console(lines)
 
+        if message == _("status", "no_campaign"):
+            self.notification_service.queue(
+                NotificationEvent.simple(
+                    NotificationEventType.NO_CAMPAIGNS,
+                    "No campaigns available",
+                    message,
+                    "idle",
+                )
+            )
+
         # Mirror to stdout/file when stdlog is enabled.
         if self._twitch.settings.stdlog:
             record = logging.LogRecord(
@@ -266,7 +286,18 @@ class WebUIManager:
         self.print("⚠️ Attention: Application requires user interaction")
 
     def start(self):
+        from version import __version__
+
         self._running = True
+        self.notification_service.queue(
+            NotificationEvent.simple(
+                NotificationEventType.APP_STARTED,
+                "Twitch Drops Miner started",
+                "The miner is running and ready.",
+                "startup",
+            )
+        )
+        self.notification_service.check_for_updates(__version__)
 
     async def coro_unless_closed(self, coro):
         """Run coro, but raise ExitRequest or ReloadRequest if those are signalled first."""
@@ -307,6 +338,27 @@ class WebUIManager:
     def display_drop(self, drop, *, countdown: bool = True, subone: bool = False):
         """Display current drop information"""
         self.progress.display(drop, countdown=countdown, subone=subone)
+        if drop is None or drop.id == self._last_mining_drop_id:
+            return
+        event_type = (
+            NotificationEventType.MINING_STARTED
+            if self._last_mining_drop_id is None
+            else NotificationEventType.MINING_SWITCHED
+        )
+        self._last_mining_drop_id = drop.id
+        title = (
+            "Mining started"
+            if event_type is NotificationEventType.MINING_STARTED
+            else "Mining switched"
+        )
+        self.notification_service.queue(
+            NotificationEvent.simple(
+                event_type,
+                title,
+                f"{drop.campaign.game.name} — {drop.rewards_text() or drop.name}",
+                drop.id,
+            )
+        )
 
     def set_games(self, games: set[Game]) -> None:
         """Set available games for settings"""

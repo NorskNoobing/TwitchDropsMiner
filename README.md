@@ -2,6 +2,14 @@
 
 This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle. This is a fork of https://github.com/DevilXD/TwitchDropsMiner that adds a web-based UI.
 
+## Integrated notifications
+
+The WebUI includes a Notifications tab with multiple destinations, per-event controls, test delivery, and recent delivery status. Discord destinations receive rich embeds containing campaign progress, game artwork, and one embed per claimed benefit. Email and advanced destinations use [Apprise](https://github.com/caronc/apprise), allowing the miner to support many notification services without another container.
+
+Notification credentials are stored in `config/notifications.json`. The application writes this file with owner-only permissions and redacts destination credentials from delivery errors.
+
+The server image is published to `ghcr.io/norsknoobing/twitchdropsminer` for AMD64 and ARM64. Version tags follow the upstream version with a fork revision suffix, for example `16.dev.ca05c8c-notify.1`; `latest` points to the newest tested release.
+
 ### Fork Modifications:
 - **Web UI** - Added a browser-based interface via NiceGUI, accessible from any device on your network — see [webui/README.md](webui/README.md)
 - **Console logging** - Added `--stdlog` command line option to output logs to stdout/stderr
@@ -10,9 +18,11 @@ This application allows you to AFK mine timed Twitch drops, without having to wo
 - **Enhanced error handling** - Improved error messages when settings files can't be loaded
 - **Login URL management** - Login URLs are copied to clipboard (tkinter GUI)
 - **About tab links** - Repository URL updated in about tab
+- **Integrated notifications** - Discord, email, and Apprise destinations configured from the WebUI
+- **Container image** - Multi-architecture image built directly from this repository
 
 > [!NOTE]
-> To run the application in Docker, see https://github.com/fireph/docker-twitch-drops-miner. DO NOT report any Docker issues to https://github.com/DevilXD/TwitchDropsMiner!
+> Docker and notification issues for this fork belong in this repository. Do not report them to https://github.com/DevilXD/TwitchDropsMiner.
 
 ### How It Works:
 

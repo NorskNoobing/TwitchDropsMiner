@@ -50,6 +50,11 @@ class HeaderBar:
                     "inventory", label=_("gui", "tabs", "inventory"), icon="inventory"
                 )
                 ui.tab("settings", label=_("gui", "tabs", "settings"), icon="settings")
+                ui.tab(
+                    "notifications",
+                    label=_("webui", "notifications", "title"),
+                    icon="notifications",
+                )
                 ui.tab("help", label=_("gui", "tabs", "help"), icon="help")
 
         return tabs

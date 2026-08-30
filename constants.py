@@ -19,9 +19,11 @@ if TYPE_CHECKING:
     from typing_extensions import TypeAlias
 
 
-# True if we're running from a built EXE (or a Linux AppImage), False inside a dev build
+# Container source is immutable like a packaged build, but resources remain in WORKING_DIR.
+IS_CONTAINER = os.environ.get("TDM_CONTAINER") == "1"
+# True if we're running from a built EXE, Linux AppImage, or container image.
 IS_APPIMAGE = "APPIMAGE" in os.environ and os.path.exists(os.environ["APPIMAGE"])
-IS_PACKAGED = hasattr(sys, "_MEIPASS") or IS_APPIMAGE
+IS_PACKAGED = hasattr(sys, "_MEIPASS") or IS_APPIMAGE or IS_CONTAINER
 # logging special levels
 CALL: int = logging.INFO - 1
 logging.addLevelName(CALL, "CALL")
@@ -48,6 +50,8 @@ def _resource_path(relative_path: Path | str) -> Path:
     """
     if IS_APPIMAGE:
         base_path = Path(sys.argv[0]).resolve().parent
+    elif IS_CONTAINER:
+        base_path = WORKING_DIR
     elif IS_PACKAGED:
         # PyInstaller's folder where the one-file app is unpacked
         meipass: str = getattr(sys, "_MEIPASS")
@@ -99,12 +103,13 @@ SCRIPTS_PATH = Path(VENV_PATH, SYS_SCRIPTS)
 # Translations path
 # NOTE: These don't have to be available to the end-user, so the path points to the internal dir
 LANG_PATH = _resource_path("lang")
-# Other Paths
-LOG_PATH = Path(WORKING_DIR, "log.txt")
-DUMP_PATH = Path(WORKING_DIR, "dump.dat")
-LOCK_PATH = Path(WORKING_DIR, "lock.file")
 CONFIG_PATH = Path(WORKING_DIR, "config")
 CACHE_PATH = Path(WORKING_DIR, "cache")
+# Runtime state belongs on the writable config volume in a container.
+STATE_PATH = CONFIG_PATH if IS_CONTAINER else WORKING_DIR
+LOG_PATH = Path(STATE_PATH, "log.txt")
+DUMP_PATH = Path(STATE_PATH, "dump.dat")
+LOCK_PATH = Path(STATE_PATH, "lock.file")
 CACHE_DB = Path(CACHE_PATH, "mapping.json")
 COOKIES_PATH = Path(CONFIG_PATH, "cookies.jar")
 SETTINGS_PATH = Path(CONFIG_PATH, "settings.json")

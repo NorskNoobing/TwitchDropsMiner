@@ -11,6 +11,7 @@ import settings as _settings
 import inventory as _inventory
 
 import webui.translations  # noqa
+from webui.notifications import NotificationEvent
 
 _settings.default_settings["priority_link_override"] = False  # type: ignore[typeddict-unknown-key]
 
@@ -50,3 +51,20 @@ setattr(
     "eligible",
     property(_eligible_get),
 )
+
+
+_original_claim = _inventory.BaseDrop.claim
+
+
+async def _claim_with_notifications(self) -> bool:
+    was_claimed = self.is_claimed
+    result = await _original_claim(self)
+    if result and not was_claimed:
+        service = self._twitch.gui.notification_service
+        service.queue(NotificationEvent.from_claimed_drop(self))
+        if self.campaign.claimed_drops == self.campaign.total_drops:
+            service.queue(NotificationEvent.campaign_completed(self))
+    return result
+
+
+setattr(_inventory.BaseDrop, "claim", _claim_with_notifications)

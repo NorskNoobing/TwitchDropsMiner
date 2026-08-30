@@ -1,0 +1,113 @@
+name: Sync Upstream Release
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-release-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: webui
+      - name: Resolve latest upstream container release
+        id: upstream
+        shell: bash
+        run: |
+          gh api repos/fireph/docker-twitch-drops-miner/releases/latest > /tmp/release.json
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import re
+
+          release = json.load(open("/tmp/release.json", encoding="utf-8"))
+          body = release.get("body") or ""
+          match = re.search(
+              r"fireph/TwitchDropsMiner(?:@`|/commit/)([0-9a-f]{7,40})",
+              body,
+          )
+          if not match:
+              raise SystemExit("Unable to find the application commit in the release notes")
+          print(f"version={release['tag_name'].lstrip('v')}")
+          print(f"commit={match.group(1)}")
+          PY
+      - name: Check whether synchronization is needed
+        id: check
+        shell: bash
+        run: |
+          current=$(jq -r .upstream_version .github/upstream-release.json)
+          if [ "$current" = "${{ steps.upstream.outputs.version }}" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Merge referenced application commit
+        if: steps.check.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add fireph https://github.com/fireph/TwitchDropsMiner.git
+          git fetch fireph webui
+          git merge --no-edit "${{ steps.upstream.outputs.commit }}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path(".github/upstream-release.json")
+          state = json.loads(path.read_text(encoding="utf-8"))
+          state.update(
+              upstream_version="${{ steps.upstream.outputs.version }}",
+              upstream_commit="${{ steps.upstream.outputs.commit }}",
+              fork_revision=1,
+          )
+          path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+      - uses: astral-sh/setup-uv@v10.0.1
+        if: steps.check.outputs.changed == 'true'
+        with:
+          python-version: "3.10"
+          enable-cache: true
+      - name: Test synchronized source
+        if: steps.check.outputs.changed == 'true'
+        run: uv run --group nicegui --group test pytest tests/ -x
+      - uses: docker/setup-buildx-action@v4
+        if: steps.check.outputs.changed == 'true'
+      - name: Smoke-build synchronized container
+        if: steps.check.outputs.changed == 'true'
+        run: docker buildx build --platform linux/amd64 --load -t twitch-drops-miner:sync-test .
+      - name: Create and merge synchronization pull request
+        if: steps.check.outputs.changed == 'true'
+        id: merge
+        shell: bash
+        run: |
+          branch="automation/upstream-${{ steps.upstream.outputs.version }}"
+          git checkout -b "$branch"
+          git add .github/upstream-release.json
+          git commit -m "Sync upstream release ${{ steps.upstream.outputs.version }}"
+          git push --force-with-lease origin "$branch"
+          url=$(gh pr create \
+            --base webui \
+            --head "$branch" \
+            --title "Sync upstream release ${{ steps.upstream.outputs.version }}" \
+            --body "Automated, tested synchronization to fireph/TwitchDropsMiner@${{ steps.upstream.outputs.commit }}.")
+          gh pr merge "$url" --merge --delete-branch
+          version="${{ steps.upstream.outputs.version }}-notify.1"
+          gh release create "$version" --target webui --generate-notes --title "v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Start GHCR publication
+        if: steps.check.outputs.changed == 'true'
+        run: gh workflow run publish-container.yml --ref webui -f version="${{ steps.merge.outputs.version }}"

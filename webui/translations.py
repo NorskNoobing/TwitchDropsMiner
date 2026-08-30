@@ -59,6 +59,17 @@ default_webui_translation: dict[str, Any] = {
             "add": "Add",
         },
         "status": {"name": "Status:"},
+        "notifications": {
+            "title": "Notifications",
+            "description": "Send miner events to Discord, email, or any service supported by Apprise.",
+            "add": "Add destination",
+            "edit": "Edit destination",
+            "empty": "No notification destinations configured.",
+            "recent": "Recent deliveries",
+            "no_history": "No notification delivery attempts yet.",
+            "test": "Send test notification",
+            "test_queued": "Test notification queued",
+        },
     }
 }
 
