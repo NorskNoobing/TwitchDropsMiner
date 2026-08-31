@@ -91,7 +91,9 @@ class NotificationEvent:
             event_type=NotificationEventType.CAMPAIGN_NOT_LINKED,
             title=f"Campaign not linked: {campaign.game.name}",
             message=campaign.name,
-            deduplication_key=f"campaign_not_linked:{campaign.id}",
+            deduplication_key=(
+                f"campaign_not_linked_game:{campaign.game.name.casefold()}"
+            ),
             game_name=campaign.game.name,
             campaign_name=campaign.name,
             claimed_drops=campaign.claimed_drops,

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from constants import PriorityMode
 from webui.adapters.inventory_overview import InventoryOverviewAdapter
 from webui.notifications.config import (
     CONFIG_VERSION,
@@ -183,25 +184,62 @@ def test_notification_config_migrates_the_previous_discord_default(tmp_path):
     assert json.loads(path.read_text(encoding="utf-8"))["version"] == CONFIG_VERSION
 
 
-def test_active_unlinked_campaign_queues_a_notification():
-    queued = []
-    displayed = []
-    manager = SimpleNamespace(
-        inventory_panel=SimpleNamespace(add_campaign=displayed.append),
-        notification_service=SimpleNamespace(queue=queued.append),
-    )
-    campaign = SimpleNamespace(
+def _unlinked_campaign(
+    *,
+    game_name="THE FINALS",
+    active=True,
+    linked=False,
+    eligible=False,
+    finished=False,
+    has_badge_or_emote=False,
+    earnable=True,
+):
+    return SimpleNamespace(
         id="campaign-1",
         name="Seasonal Drops Campaign",
-        game=SimpleNamespace(name="THE FINALS"),
-        active=True,
-        linked=False,
-        finished=False,
+        game=SimpleNamespace(name=game_name),
+        active=active,
+        linked=linked,
+        eligible=eligible,
+        finished=finished,
+        has_badge_or_emote=has_badge_or_emote,
         claimed_drops=1,
         total_drops=5,
         image_url="https://example.test/game.jpg",
         link_url="https://example.test/link-account",
+        drops=[SimpleNamespace(_can_earn_within=lambda _: earnable)],
     )
+
+
+def _unlinked_manager(
+    queued,
+    displayed=None,
+    *,
+    priority_mode=PriorityMode.PRIORITY_ONLY,
+    priority=None,
+    exclude=None,
+    enable_badges_emotes=False,
+):
+    settings = SimpleNamespace(
+        priority_mode=priority_mode,
+        priority=["THE FINALS"] if priority is None else priority,
+        exclude=set() if exclude is None else exclude,
+        enable_badges_emotes=enable_badges_emotes,
+    )
+    return SimpleNamespace(
+        _twitch=SimpleNamespace(settings=settings),
+        inventory_panel=SimpleNamespace(
+            add_campaign=(displayed.append if displayed is not None else lambda _: None)
+        ),
+        notification_service=SimpleNamespace(queue=queued.append),
+    )
+
+
+def test_selected_active_unlinked_campaign_queues_a_notification():
+    queued = []
+    displayed = []
+    manager = _unlinked_manager(queued, displayed)
+    campaign = _unlinked_campaign()
 
     asyncio.run(InventoryOverviewAdapter(manager).add_campaign(campaign))
 
@@ -212,6 +250,7 @@ def test_active_unlinked_campaign_queues_a_notification():
     assert event.title == "Campaign not linked: THE FINALS"
     assert event.message == "Seasonal Drops Campaign"
     assert event.link_url.endswith("link-account")
+    assert event.deduplication_key == "campaign_not_linked_game:the finals"
 
     payload = build_discord_payload(event, NotificationDestination())
     assert payload["embeds"][0]["url"].endswith("link-account")
@@ -219,22 +258,57 @@ def test_active_unlinked_campaign_queues_a_notification():
 
 
 @pytest.mark.parametrize(
-    "active,linked,finished",
-    [(False, False, False), (True, True, False), (True, False, True)],
+    "campaign_kwargs,manager_kwargs",
+    [
+        ({"active": False}, {}),
+        ({"linked": True, "eligible": True}, {}),
+        ({"eligible": True}, {}),
+        ({"finished": True}, {}),
+        ({"earnable": False}, {}),
+        ({"game_name": "Off-list Game"}, {}),
+        ({}, {"exclude": {"THE FINALS"}}),
+        ({"has_badge_or_emote": True}, {}),
+    ],
 )
-def test_campaign_without_unlinked_blocker_does_not_queue(
-    active, linked, finished
+def test_campaign_without_unlinked_mining_blocker_does_not_queue(
+    campaign_kwargs, manager_kwargs
 ):
     queued = []
-    manager = SimpleNamespace(
-        inventory_panel=SimpleNamespace(add_campaign=lambda _: None),
-        notification_service=SimpleNamespace(queue=queued.append),
-    )
-    campaign = SimpleNamespace(active=active, linked=linked, finished=finished)
+    manager = _unlinked_manager(queued, **manager_kwargs)
+    campaign = _unlinked_campaign(**campaign_kwargs)
 
     asyncio.run(InventoryOverviewAdapter(manager).add_campaign(campaign))
 
     assert queued == []
+
+
+def test_non_priority_mode_can_notify_for_a_non_priority_game():
+    queued = []
+    manager = _unlinked_manager(
+        queued,
+        priority_mode=PriorityMode.ENDING_SOONEST,
+        priority=[],
+    )
+
+    asyncio.run(
+        InventoryOverviewAdapter(manager).add_campaign(
+            _unlinked_campaign(game_name="Off-list Game")
+        )
+    )
+
+    assert len(queued) == 1
+
+
+def test_unlinked_campaigns_for_the_same_game_share_a_deduplication_key():
+    first = _unlinked_campaign()
+    second = _unlinked_campaign()
+    second.id = "campaign-2"
+    second.name = "Another Campaign"
+
+    first_event = NotificationEvent.campaign_not_linked(first)
+    second_event = NotificationEvent.campaign_not_linked(second)
+
+    assert first_event.deduplication_key == second_event.deduplication_key
 
 
 def test_test_delivery_uses_artwork_from_the_loaded_inventory(tmp_path, monkeypatch):
