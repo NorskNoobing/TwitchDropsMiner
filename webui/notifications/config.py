@@ -14,9 +14,15 @@ from constants import CONFIG_PATH
 from .models import DEFAULT_EVENT_TYPES, NotificationEventType
 
 
-CONFIG_VERSION = 2
+CONFIG_VERSION = 3
 DEFAULT_DISCORD_COLOR = 0x237FEB
 LEGACY_DEFAULT_DISCORD_COLOR = 0x7D46FF
+LEGACY_DEFAULT_EVENTS = {
+    NotificationEventType.DROP_CLAIMED.value,
+    NotificationEventType.CAMPAIGN_COMPLETED.value,
+    NotificationEventType.LOGIN_REQUIRED.value,
+    NotificationEventType.MINER_ERROR.value,
+}
 
 
 @dataclass
@@ -105,13 +111,21 @@ class NotificationConfig:
                 NotificationDestination.from_dict(item)
                 for item in data.get("destinations", [])
             ]
-            if int(data.get("version", 1)) < CONFIG_VERSION:
+            version = int(data.get("version", 1))
+            if version < 2:
                 for destination in self.destinations:
                     if (
                         destination.provider == "discord"
                         and destination.color == LEGACY_DEFAULT_DISCORD_COLOR
                     ):
                         destination.color = DEFAULT_DISCORD_COLOR
+            if version < 3:
+                for destination in self.destinations:
+                    if set(destination.events) == LEGACY_DEFAULT_EVENTS:
+                        destination.events = sorted(
+                            event.value for event in DEFAULT_EVENT_TYPES
+                        )
+            if version < CONFIG_VERSION:
                 self.save()
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
             self.load_error = f"Unable to load notification settings: {exc}"

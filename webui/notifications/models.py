@@ -8,6 +8,7 @@ from enum import Enum
 class NotificationEventType(str, Enum):
     DROP_CLAIMED = "drop_claimed"
     CAMPAIGN_COMPLETED = "campaign_completed"
+    CAMPAIGN_NOT_LINKED = "campaign_not_linked"
     MINING_STARTED = "mining_started"
     MINING_SWITCHED = "mining_switched"
     NO_CAMPAIGNS = "no_campaigns"
@@ -19,7 +20,7 @@ class NotificationEventType(str, Enum):
 
 DEFAULT_EVENT_TYPES = {
     NotificationEventType.DROP_CLAIMED,
-    NotificationEventType.CAMPAIGN_COMPLETED,
+    NotificationEventType.CAMPAIGN_NOT_LINKED,
     NotificationEventType.LOGIN_REQUIRED,
     NotificationEventType.MINER_ERROR,
 }
@@ -82,6 +83,25 @@ class NotificationEvent:
             claimed_drops=campaign.claimed_drops,
             total_drops=campaign.total_drops,
             game_image_url=str(campaign.image_url or ""),
+        )
+
+    @classmethod
+    def campaign_not_linked(cls, campaign) -> "NotificationEvent":
+        return cls(
+            event_type=NotificationEventType.CAMPAIGN_NOT_LINKED,
+            title=f"Campaign not linked: {campaign.game.name}",
+            message=campaign.name,
+            deduplication_key=f"campaign_not_linked:{campaign.id}",
+            game_name=campaign.game.name,
+            campaign_name=campaign.name,
+            claimed_drops=campaign.claimed_drops,
+            total_drops=campaign.total_drops,
+            game_image_url=str(campaign.image_url or ""),
+            link_url=(
+                str(campaign.link_url)
+                if campaign.link_url
+                else "https://www.twitch.tv/drops/inventory"
+            ),
         )
 
     @classmethod

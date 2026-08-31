@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from webui.adapters.inventory_overview import InventoryOverviewAdapter
 from webui.notifications.config import (
     CONFIG_VERSION,
     DEFAULT_DISCORD_COLOR,
@@ -107,6 +108,13 @@ def test_discord_destination_rejects_non_webhook_urls(url):
         destination.validate()
 
 
+def test_default_events_include_unlinked_but_not_campaign_completed():
+    events = set(NotificationDestination().events)
+
+    assert NotificationEventType.CAMPAIGN_NOT_LINKED.value in events
+    assert NotificationEventType.CAMPAIGN_COMPLETED.value not in events
+
+
 def test_notification_config_round_trip_and_restrictive_mode(tmp_path):
     path = tmp_path / "notifications.json"
     config = NotificationConfig(path)
@@ -138,12 +146,19 @@ def test_notification_config_migrates_the_previous_discord_default(tmp_path):
                         "provider": "discord",
                         "url": "https://discord.com/api/webhooks/1/token",
                         "color": 0x7D46FF,
+                        "events": [
+                            "drop_claimed",
+                            "campaign_completed",
+                            "login_required",
+                            "miner_error",
+                        ],
                     },
                     {
                         "name": "Custom Discord",
                         "provider": "discord",
                         "url": "https://discord.com/api/webhooks/2/token",
                         "color": 0x123456,
+                        "events": ["drop_claimed", "campaign_completed"],
                     },
                 ],
             }
@@ -155,7 +170,71 @@ def test_notification_config_migrates_the_previous_discord_default(tmp_path):
 
     assert config.destinations[0].color == DEFAULT_DISCORD_COLOR
     assert config.destinations[1].color == 0x123456
+    assert set(config.destinations[0].events) == {
+        "drop_claimed",
+        "campaign_not_linked",
+        "login_required",
+        "miner_error",
+    }
+    assert set(config.destinations[1].events) == {
+        "drop_claimed",
+        "campaign_completed",
+    }
     assert json.loads(path.read_text(encoding="utf-8"))["version"] == CONFIG_VERSION
+
+
+def test_active_unlinked_campaign_queues_a_notification():
+    queued = []
+    displayed = []
+    manager = SimpleNamespace(
+        inventory_panel=SimpleNamespace(add_campaign=displayed.append),
+        notification_service=SimpleNamespace(queue=queued.append),
+    )
+    campaign = SimpleNamespace(
+        id="campaign-1",
+        name="Seasonal Drops Campaign",
+        game=SimpleNamespace(name="THE FINALS"),
+        active=True,
+        linked=False,
+        finished=False,
+        claimed_drops=1,
+        total_drops=5,
+        image_url="https://example.test/game.jpg",
+        link_url="https://example.test/link-account",
+    )
+
+    asyncio.run(InventoryOverviewAdapter(manager).add_campaign(campaign))
+
+    assert displayed == [campaign]
+    assert len(queued) == 1
+    event = queued[0]
+    assert event.event_type is NotificationEventType.CAMPAIGN_NOT_LINKED
+    assert event.title == "Campaign not linked: THE FINALS"
+    assert event.message == "Seasonal Drops Campaign"
+    assert event.link_url.endswith("link-account")
+
+    payload = build_discord_payload(event, NotificationDestination())
+    assert payload["embeds"][0]["url"].endswith("link-account")
+    assert payload["embeds"][0]["thumbnail"]["url"].endswith("game.jpg")
+
+
+@pytest.mark.parametrize(
+    "active,linked,finished",
+    [(False, False, False), (True, True, False), (True, False, True)],
+)
+def test_campaign_without_unlinked_blocker_does_not_queue(
+    active, linked, finished
+):
+    queued = []
+    manager = SimpleNamespace(
+        inventory_panel=SimpleNamespace(add_campaign=lambda _: None),
+        notification_service=SimpleNamespace(queue=queued.append),
+    )
+    campaign = SimpleNamespace(active=active, linked=linked, finished=finished)
+
+    asyncio.run(InventoryOverviewAdapter(manager).add_campaign(campaign))
+
+    assert queued == []
 
 
 def test_test_delivery_uses_artwork_from_the_loaded_inventory(tmp_path, monkeypatch):

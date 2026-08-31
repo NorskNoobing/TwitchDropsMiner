@@ -44,6 +44,7 @@ def build_discord_payload(
         embed = {
             "title": event.title,
             "description": event.message,
+            "url": event.link_url,
             "color": destination.color,
             "timestamp": event.created_at.isoformat(),
         }
