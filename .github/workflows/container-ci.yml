@@ -22,9 +22,20 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64
           push: false
+          load: true
           tags: twitch-drops-miner:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Test browser login in the unprivileged runtime container
+        run: |
+          docker build -t twitch-drops-miner:browser-test - <<'DOCKERFILE'
+          FROM twitch-drops-miner:test
+          RUN /usr/local/bin/python -m pip install --no-cache-dir --target /tmp/browser-test-deps pytest
+          DOCKERFILE
+          docker run --rm --network none \
+            -e PYTHONPATH=/tmp/browser-test-deps -e TDM_BROWSER_TESTS=1 \
+            twitch-drops-miner:browser-test \
+            python -m pytest tests/test_browser_login_integration.py -x -q -p no:cacheprovider
       - name: Scan repository and dependencies
         uses: aquasecurity/trivy-action@v0.36.0
         with:
