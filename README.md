@@ -16,7 +16,7 @@ The server image is published to `ghcr.io/norsknoobing/twitchdropsminer` for AMD
 - **Streamlined settings** - Moved settings into ./config folder
 - **Automated upstream sync** - Workflow to automatically merge updates from the upstream repository
 - **Enhanced error handling** - Improved error messages when settings files can't be loaded
-- **Login URL management** - Login URLs are copied to clipboard (tkinter GUI)
+- **Chromium Login** - Opens twitch.tv login webpage in app
 - **About tab links** - Repository URL updated in about tab
 - **Integrated notifications** - Discord, email, and Apprise destinations configured from the WebUI
 - **Container image** - Multi-architecture image built directly from this repository
