@@ -18,7 +18,8 @@ LABEL org.opencontainers.image.title="Twitch Drops Miner" \
       org.opencontainers.image.source="https://github.com/NorskNoobing/TwitchDropsMiner" \
       org.opencontainers.image.licenses="MIT"
 
-ENV GROUP_ID=1000 \
+ENV CHROMIUM_USER_FLAGS=--no-sandbox \
+    GROUP_ID=1000 \
     PATH="/TwitchDropsMiner/.venv/bin:${PATH}" \
     TDM_CONTAINER=1 \
     TDM_VERSION_TAG="${TDM_VERSION_TAG}" \
@@ -26,9 +27,11 @@ ENV GROUP_ID=1000 \
     UI_BACKEND=nicegui \
     USER_ID=1000 \
     WEBUI_HOST=0.0.0.0 \
-    WEBUI_PORT=5800
+    WEBUI_PORT=5800 \
+    XDG_CACHE_HOME=/tmp/.cache \
+    XDG_CONFIG_HOME=/tmp/.config
 
-RUN apk add --no-cache ca-certificates curl su-exec tzdata
+RUN apk add --no-cache ca-certificates chromium curl font-dejavu novnc openssl su-exec tzdata x11vnc xvfb
 
 WORKDIR /TwitchDropsMiner
 COPY --from=builder /TwitchDropsMiner /TwitchDropsMiner
