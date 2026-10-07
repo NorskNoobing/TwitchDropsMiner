@@ -23,6 +23,8 @@ jobs:
         with:
           fetch-depth: 0
           ref: webui
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+          persist-credentials: true
       - name: Resolve latest upstream container release
         id: upstream
         shell: bash
