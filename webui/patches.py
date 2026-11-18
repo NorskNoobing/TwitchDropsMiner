@@ -32,6 +32,8 @@ async def _claim_with_notifications(self) -> bool:
 setattr(_inventory.BaseDrop, "claim", _claim_with_notifications)
 
 _settings.default_settings["priority_link_override"] = False  # type: ignore[typeddict-unknown-key]
+_settings.default_settings["point_farming_enabled"] = False  # type: ignore[typeddict-unknown-key]
+_settings.default_settings["point_farming_channels"] = []  # type: ignore[typeddict-unknown-key]
 
 
 def _priority_link_override_get(self) -> bool:
@@ -87,3 +89,8 @@ if os.environ.get("WEBUI_TWITCH_LOGIN", "android-browser") == "android-browser":
     _twitch.first_to_complete = first_to_complete
 else:
     _twitch._AuthState._browser_login = _twitch._AuthState._oauth_login
+
+
+from webui.point_farming import install as _install_point_farming
+
+_install_point_farming(_twitch.Twitch)

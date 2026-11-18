@@ -802,7 +802,10 @@ class Twitch:
                         del channels[channel.id]
                         channel.remove()
                     del to_remove_channels, to_remove_topics
-                if self.wanted_games:
+                if self.wanted_games or (
+                    (farmer := getattr(self, "point_farming", None)) is not None
+                    and farmer.enabled
+                ):
                     self.change_state(State.CHANNELS_FETCH)
                 else:
                     # with no games available, we switch to IDLE after cleanup
@@ -839,6 +842,9 @@ class Twitch:
                     # for every campaign without an ACL, for it's game,
                     # add a list of live channels with drops enabled
                     new_channels.update(await self.get_live_streams(game, drops_enabled=True))
+                # WebUI fallback channels share the same watcher and channel lifecycle.
+                if (farmer := getattr(self, "point_farming", None)) is not None:
+                    new_channels.update(await farmer.channels(new_channels))
                 # sort them descending by viewers, by priority and by game priority
                 # NOTE: Viewers sort also ensures ONLINE channels are sorted to the top
                 # NOTE: We can drop using the set now, because there's no more channels being added

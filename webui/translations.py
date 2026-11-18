@@ -25,6 +25,18 @@ from utils import json_save
 # webui/lang/<language>.json overrides are applied on top.
 default_webui_translation: dict[str, Any] = {
     "webui": {
+        "points": {
+            "title": "Channel point farming",
+            "description": "When no selected drops can be earned, watch the first live channel in this list. Drops always take priority. Channels are checked every minute and new campaigns every five minutes.",
+            "enabled": "Farm channel points when drops are unavailable",
+            "channels": "Channels in priority order (one per line)",
+            "save": "Apply channel point settings",
+            "saved": "Channel point settings saved",
+            "invalid": "Use Twitch channel names or channel URLs, up to 20 channels.",
+            "farming": "Farming channel points: {channel}",
+            "balance": "Farming channel points: {channel} ({balance} points)",
+            "waiting": "Waiting for a selected channel to go live",
+        },
         "settings": {
             "advanced": {
                 "priority_link_override": "Mine unlinked games from the Priority List: "

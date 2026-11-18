@@ -2,6 +2,12 @@
 
 This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle. This is a fork of https://github.com/DevilXD/TwitchDropsMiner that adds a web-based UI.
 
+## Channel point fallback (WebUI)
+
+In **Settings → Channel point farming**, enter Twitch channel names or channel URLs in priority order, enable farming, and apply. The first live selected channel is watched only when no eligible selected drops can be earned on a discovered live channel. A live drop channel immediately takes priority, including over a manual fallback selection. Farming resumes after drops finish or their channels go offline.
+
+The feature is off by default and uses the existing account and single watcher. It checks channels every minute, refreshes campaigns every five minutes while enabled, sends minute-watched telemetry and claims available point bonuses. The status shows only Twitch-reported balances; request success alone does not prove Twitch credited points. Twitch API changes can affect earnings. It does not spend points, bet, follow channels, or join raids. Disabling farming stops fallback watching and restores normal drop selection.
+
 ## Integrated notifications
 
 The WebUI includes a Notifications tab with multiple destinations, per-event controls, test delivery, and recent delivery status. Discord destinations receive rich embeds containing campaign progress, game artwork, and one embed per claimed benefit. Their default identity is Twitch Drops Miner with the project logo and a `#237feb` embed color. Test deliveries use artwork from a currently loaded campaign so they exercise the same Twitch image data as real claims. The default event selection also warns when an active, unfinished campaign is blocked only by an unlinked game account and otherwise matches the current mining selection. These warnings are deduplicated per game; campaign-completion alerts remain available as an opt-in event. Email and advanced destinations use [Apprise](https://github.com/caronc/apprise), allowing the miner to support many notification services without another container.
@@ -131,7 +137,7 @@ Twitch Drops Miner (TDM for short) has been designed with a couple of simple goa
 
 TDM is not intended for/as:
 
-- Mining channel points - again, it's about the drops: only.
+- Standalone channel-point-only operation in the upstream desktop GUI. This fork supports opt-in WebUI fallback farming as described above.
 - Mining anything else besides Twitch drops - no, I won't be adding support for a random 3rd party site that also happens to rely on watching Twitch streams.
 - Unattended operation: worst case scenario, it'll stop working and you'll hopefully notice that at some point. Hopefully.
 - 100% uptime application, due to the underlying nature of it, expect fatal errors to happen every so often.
