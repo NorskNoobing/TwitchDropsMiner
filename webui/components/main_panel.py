@@ -6,6 +6,7 @@ from nicegui import ui
 
 from translate import _
 from .base_panel import BasePanel
+from .main.points_dashboard import PointsDashboard
 from .main import (
     ChannelsSection,
     ConsoleSection,
@@ -24,6 +25,7 @@ class MainPanel(BasePanel):
         self._ws_section = WebsocketSection(manager)
         self._login_section = LoginSection(manager)
         self._drop_section = DropSection(manager)
+        self._points_dashboard = PointsDashboard(manager)
         self._console_section = ConsoleSection()
         self._channels_section = ChannelsSection(manager)
 
@@ -50,6 +52,7 @@ class MainPanel(BasePanel):
                         self._ws_section.build()
                         self._login_section.build()
 
+                    self._points_dashboard.build()
                     self._drop_section.build()
                     self._console_section.build()
 

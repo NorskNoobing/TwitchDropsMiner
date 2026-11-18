@@ -54,6 +54,14 @@ class PointFarming:
         self.last_channel_check = monotonic()
         self.last_campaign_check = monotonic()
         self.balances: dict[int, int] = {}
+        self.gained: dict[int, int] = {}
+        self.bonus_claims: dict[int, int] = {}
+        self.channel_names: dict[int, str] = {}
+        self.checked_at: dict[int, float] = {}
+        self.last_points = float("-inf")
+        self.refresh_failed = False
+        self._points_lock = asyncio.Lock()
+        self._claimed_ids: list[tuple[int, str]] = []
 
     @property
     def logins(self) -> list[str]:
@@ -158,6 +166,120 @@ class PointFarming:
         ) as response:
             return response.status == 204
 
+    def is_current(self, channel):
+        return (
+            self.enabled
+            and channel.online
+            and self.twitch.watching_channel.get_with_default(None) is channel
+            and not self.twitch.gui._reload_requested.is_set()
+            and self.twitch._state not in (State.EXIT, State.RESTART)
+        )
+
+    def record_balance(self, channel, balance):
+        if type(balance) is not int or balance < 0:
+            raise ValueError("Invalid point balance")
+        previous = self.balances.get(channel.id, balance)
+        self.gained[channel.id] = self.gained.get(channel.id, 0) + max(
+            0, balance - previous
+        )
+        if self.balances.get(channel.id) != balance:
+            logger.info("Channel point balance for %s: %d", channel.name, balance)
+        self.balances[channel.id] = balance
+        self.channel_names[channel.id] = channel.name
+        self.checked_at[channel.id] = monotonic()
+
+    def dashboard_rows(self):
+        return [
+            {
+                "id": cid,
+                "channel": self.channel_names[cid],
+                "balance_value": f"{balance:,}",
+                "gained": f"+{self.gained[cid]:,}",
+                "bonus_claims": self.bonus_claims.get(cid, 0),
+                "checked": _("webui", "points", "seconds_ago").format(
+                    seconds=max(0, int(monotonic() - self.checked_at[cid]))
+                ),
+            }
+            for cid, balance in self.balances.items()
+        ]
+
+    async def refresh_points(self, channel):
+        async with self._points_lock:
+            if not self.is_current(channel) or monotonic() - self.last_points < 60:
+                return
+            self.last_points = monotonic()
+            try:
+                response = await asyncio.wait_for(
+                    self.twitch.gql_request(
+                        GQL_QUERIES["ChannelPointsContext"].with_variables(
+                            {"channelLogin": channel._login}
+                        )
+                    ),
+                    REQUEST_TIMEOUT,
+                )
+                if not self.is_current(channel):
+                    return
+                points = response["data"]["community"]["channel"]["self"][
+                    "communityPoints"
+                ]
+                self.record_balance(channel, points["balance"])
+                self.refresh_failed = False
+                claim = points.get("availableClaim")
+                claim_key = (channel.id, claim["id"]) if claim else None
+                if (
+                    claim_key
+                    and claim_key not in self._claimed_ids
+                    and self.is_current(channel)
+                ):
+                    result = await asyncio.wait_for(
+                        self.twitch.gql_request(
+                            GQL_QUERIES["ClaimCommunityPoints"].with_variables(
+                                {
+                                    "input": {
+                                        "claimID": claim["id"],
+                                        "channelID": str(channel.id),
+                                    }
+                                }
+                            )
+                        ),
+                        REQUEST_TIMEOUT,
+                    )
+                    if not self.is_current(channel):
+                        return
+                    claimed = (result.get("data") or {}).get("claimCommunityPoints")
+                    # Count only a successful Twitch mutation, never a request attempt.
+                    if (
+                        isinstance(claimed, dict)
+                        and claimed.get("error") is None
+                        and not result.get("errors")
+                        and type((claimed.get("currentPoints") or {}).get("balance"))
+                        is int
+                        and claimed["currentPoints"]["balance"] >= 0
+                    ):
+                        self._claimed_ids.append(claim_key)
+                        self._claimed_ids = self._claimed_ids[-256:]
+                        self.bonus_claims[channel.id] = (
+                            self.bonus_claims.get(channel.id, 0) + 1
+                        )
+                        balance = (claimed.get("currentPoints") or {}).get("balance")
+                        if type(balance) is int and balance >= 0:
+                            self.record_balance(channel, balance)
+                    else:
+                        self.refresh_failed = True
+                if self.active(channel):
+                    self.twitch.gui.status.update(self.status(channel))
+            except (ExitRequest, ReloadRequest):
+                raise
+            except (
+                RequestException,
+                asyncio.TimeoutError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ):
+                self.refresh_failed = True
+                logger.warning("Channel point update unavailable; retrying next minute")
+
     async def minute(self, channel):
         if not self.active(channel) or monotonic() - self.last_minute < 60:
             return
@@ -166,54 +288,12 @@ class PointFarming:
             sent = await asyncio.wait_for(self.send_minute(channel), REQUEST_TIMEOUT)
             if not sent:
                 logger.warning("Twitch did not accept channel point watch telemetry")
-            if not self.active(channel):
-                return
-            response = await asyncio.wait_for(
-                self.twitch.gql_request(
-                    GQL_QUERIES["ChannelPointsContext"].with_variables(
-                        {"channelLogin": channel._login}
-                    )
-                ),
-                REQUEST_TIMEOUT,
-            )
-            if not self.active(channel):
-                return
-            context = response["data"]["community"]["channel"]
-            points = context["self"]["communityPoints"]
-            balance = points["balance"]
-            if type(balance) is int and balance >= 0:
-                if self.balances.get(channel.id) != balance:
-                    logger.info(
-                        "Channel point balance for %s: %d", channel.name, balance
-                    )
-                self.balances[channel.id] = balance
-            claim = points.get("availableClaim")
-            if claim and self.active(channel):
-                await asyncio.wait_for(
-                    self.twitch.gql_request(
-                        GQL_QUERIES["ClaimCommunityPoints"].with_variables(
-                            {
-                                "input": {
-                                    "claimID": claim["id"],
-                                    "channelID": str(channel.id),
-                                }
-                            }
-                        )
-                    ),
-                    REQUEST_TIMEOUT,
-                )
-            if self.active(channel):
-                self.twitch.gui.status.update(self.status(channel))
         except (ExitRequest, ReloadRequest):
             raise
-        except (
-            RequestException,
-            asyncio.TimeoutError,
-            KeyError,
-            TypeError,
-            ValueError,
-        ):
-            logger.warning("Channel point update unavailable; retrying next minute")
+        except (RequestException, asyncio.TimeoutError):
+            logger.warning("Channel point watch telemetry unavailable")
+        # Balance reads and bonus claims do not depend on telemetry acceptance.
+        await self.refresh_points(channel)
 
     def poll(self):
         twitch = self.twitch
@@ -241,6 +321,9 @@ class PointFarming:
         while True:
             await asyncio.sleep(1)
             self.poll()
+            channel = self.twitch.watching_channel.get_with_default(None)
+            if channel is not None:
+                await self.refresh_points(channel)
 
 
 def install(twitch_cls):
@@ -266,6 +349,13 @@ def install(twitch_cls):
             with suppress(asyncio.CancelledError):
                 await task
             farmer.balances.clear()
+            farmer.gained.clear()
+            farmer.bonus_claims.clear()
+            farmer.channel_names.clear()
+            farmer.checked_at.clear()
+            farmer._claimed_ids.clear()
+            farmer.last_points = float("-inf")
+            farmer.refresh_failed = False
             farmer.last_minute = float("-inf")
             farmer.last_channel_check = farmer.last_campaign_check = monotonic()
 

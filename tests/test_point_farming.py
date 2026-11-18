@@ -249,6 +249,7 @@ def test_point_api_failure_is_nonfatal_but_reload_propagates(client):
         client.gql_request.side_effect = GQLException("fixture")
         await client.point_farming.minute(watched)
         client.point_farming.last_minute = float("-inf")
+        client.point_farming.last_points = float("-inf")
         client.gql_request.side_effect = ReloadRequest()
         with pytest.raises(ReloadRequest):
             await client.point_farming.minute(watched)

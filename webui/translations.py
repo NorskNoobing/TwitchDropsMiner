@@ -27,6 +27,17 @@ default_webui_translation: dict[str, Any] = {
     "webui": {
         "points": {
             "title": "Channel point farming",
+            "dashboard": "Channel points",
+            "session_note": "Gains are observed balance increases since this backend session started, including bonuses. Spending does not subtract from gains. Counters reset on restart or sign-in change.",
+            "channel": "Channel",
+            "balance_value": "Balance",
+            "gained": "Gained this session",
+            "bonus_claims": "Bonus chests claimed",
+            "checked": "Last checked",
+            "seconds_ago": "{seconds}s ago",
+            "waiting_balance": "Waiting for a live watched channel and its first balance check. Enable channel point farming in Settings.",
+            "refresh_failed": "Balance refresh or bonus claim failed; showing the last confirmed balance. Retrying automatically.",
+            "auto_bonus": "Balances refresh about once a minute. Available Twitch bonus chests are claimed automatically.",
             "description": "When no selected drops can be earned, watch the first live channel in this list. Drops always take priority. Channels are checked every minute and new campaigns every five minutes.",
             "enabled": "Farm channel points when drops are unavailable",
             "channels": "Channels in priority order (one per line)",
