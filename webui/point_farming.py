@@ -247,23 +247,25 @@ class PointFarming:
                     if not self.is_current(channel):
                         return
                     claimed = (result.get("data") or {}).get("claimCommunityPoints")
-                    # Count only a successful Twitch mutation, never a request attempt.
+                    # Twitch's ClaimCommunityPointsPayload.currentPoints is an Int.
+                    balance = (
+                        claimed.get("currentPoints")
+                        if isinstance(claimed, dict)
+                        else None
+                    )
                     if (
                         isinstance(claimed, dict)
                         and claimed.get("error") is None
                         and not result.get("errors")
-                        and type((claimed.get("currentPoints") or {}).get("balance"))
-                        is int
-                        and claimed["currentPoints"]["balance"] >= 0
+                        and type(balance) is int
+                        and balance >= 0
                     ):
                         self._claimed_ids.append(claim_key)
                         self._claimed_ids = self._claimed_ids[-256:]
                         self.bonus_claims[channel.id] = (
                             self.bonus_claims.get(channel.id, 0) + 1
                         )
-                        balance = (claimed.get("currentPoints") or {}).get("balance")
-                        if type(balance) is int and balance >= 0:
-                            self.record_balance(channel, balance)
+                        self.record_balance(channel, balance)
                     else:
                         self.refresh_failed = True
                 if self.active(channel):

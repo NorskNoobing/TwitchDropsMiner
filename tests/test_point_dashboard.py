@@ -34,7 +34,7 @@ def test_claims_confirmed_bonus_once_and_includes_reported_credit(client):
                 "data": {
                     "claimCommunityPoints": {
                         "error": None,
-                        "currentPoints": {"balance": 200},
+                        "currentPoints": 200,
                     }
                 }
             },
@@ -58,6 +58,8 @@ def test_claims_confirmed_bonus_once_and_includes_reported_credit(client):
         {"data": {"claimCommunityPoints": {"error": "ALREADY_CLAIMED"}}},
         {"data": {"claimCommunityPoints": None}},
         {"data": {"claimCommunityPoints": {}}},
+        {"data": {"claimCommunityPoints": {"currentPoints": True}}},
+        {"data": {"claimCommunityPoints": {"currentPoints": {"balance": 150}}}},
         {"data": {}},
         {"errors": [{"message": "fixture"}]},
     ],
@@ -120,7 +122,7 @@ def test_concurrent_pollers_do_not_duplicate_claims(client):
                 "data": {
                     "claimCommunityPoints": {
                         "error": None,
-                        "currentPoints": {"balance": 150},
+                        "currentPoints": 150,
                     }
                 }
             },
