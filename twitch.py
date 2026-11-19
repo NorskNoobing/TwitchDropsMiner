@@ -813,10 +813,8 @@ class Twitch:
                     self.change_state(State.IDLE)
             elif self._state is State.CHANNELS_FETCH:
                 self.gui.status.update(_("gui", "status", "gathering"))
-                # start with all current channels, clear the memory and GUI
+                # Keep tracked channels available to websocket callbacks during discovery.
                 new_channels: set[Channel] = set(channels.values())
-                channels.clear()
-                self.gui.channels.clear()
                 # gather and add ACL channels from campaigns
                 # NOTE: we consider only campaigns that can be progressed
                 # NOTE: we use another set so that we can set them online separately
@@ -871,7 +869,9 @@ class Twitch:
                         )
                     self.websocket.remove_topics(to_remove_topics)
                     del to_remove_channels, to_remove_topics
-                # set our new channel list
+                # Publish the new lookup without yielding between clearing and repopulating.
+                channels.clear()
+                self.gui.channels.clear()
                 for channel in ordered_channels:
                     channels[channel.id] = channel
                     channel.display(add=True)
