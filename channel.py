@@ -42,6 +42,7 @@ class Stream:
         self.game: Game | None = Game(game) if game else None
         self.title: str = title
         self._stream_url: URLType | None = None
+        self.playback_unavailable = False
 
     @cached_property
     def _watch_payload(self) -> list[JsonType]:
@@ -118,6 +119,7 @@ class Stream:
     async def get_stream_url(self) -> URLType | None:
         if self._stream_url is not None:
             return self._stream_url
+        self.playback_unavailable = False
         # get the stream playback access token from GQL
         playback_token_response: JsonType = await self.channel._twitch.gql_request(
             GQL_QUERIES["PlaybackAccessToken"].with_variables({"login": self.channel._login})
@@ -147,7 +149,11 @@ class Stream:
                 if isinstance(available_json, list):
                     available_json = available_json[0]
                 if "error" in available_json:
-                    logger.error(f"Stream URL get error: \"{available_json['error']}\"")
+                    self.playback_unavailable = available_json["error"] == "Can not find channel"
+                    if self.playback_unavailable:
+                        logger.info("Stream is no longer available for %s", self.channel.name)
+                    else:
+                        logger.error(f"Stream URL get error: \"{available_json['error']}\"")
                     self.channel.set_offline()
                 return None
             # pick the last URL from the list, usually with the lowest quality stream

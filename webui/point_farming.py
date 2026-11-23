@@ -20,6 +20,7 @@ logger = logging.getLogger("TwitchDrops")
 CHANNEL_INTERVAL = 60
 CAMPAIGN_INTERVAL = 300
 REQUEST_TIMEOUT = 20
+UNAVAILABLE_STREAM_RETRY = 300
 
 
 def parse_channels(text: str) -> list[str]:
@@ -61,6 +62,7 @@ class PointFarming:
         self.last_points = float("-inf")
         self.refresh_failed = False
         self._points_lock = asyncio.Lock()
+        self.unavailable_streams: dict[int, tuple[int, float]] = {}
         self._claimed_ids: list[tuple[int, str]] = []
 
     @property
@@ -71,15 +73,29 @@ class PointFarming:
     def enabled(self) -> bool:
         return bool(self.twitch.settings.point_farming_enabled and self.logins)
 
+    def stream_available(self, channel) -> bool:
+        blocked = self.unavailable_streams.get(channel.id)
+        if blocked is None:
+            return True
+        stream = channel._stream
+        if stream is None:
+            return False
+        if stream.broadcast_id != blocked[0] or monotonic() >= blocked[1]:
+            self.unavailable_streams.pop(channel.id, None)
+            return True
+        return False
+
     def drop_available(self) -> bool:
         return any(
-            self.drop_can_watch(self.twitch, ch) for ch in self.twitch.channels.values()
+            self.stream_available(ch) and self.drop_can_watch(self.twitch, ch)
+            for ch in self.twitch.channels.values()
         )
 
     def can_farm(self, channel) -> bool:
         return (
             self.enabled
             and channel.online
+            and self.stream_available(channel)
             and channel._login.lower() in self.logins
             and not self.drop_available()
         )
@@ -356,13 +372,17 @@ def install(twitch_cls):
             farmer.channel_names.clear()
             farmer.checked_at.clear()
             farmer._claimed_ids.clear()
+            farmer.unavailable_streams.clear()
             farmer.last_points = float("-inf")
             farmer.refresh_failed = False
             farmer.last_minute = float("-inf")
             farmer.last_channel_check = farmer.last_campaign_check = monotonic()
 
     def can_watch(self, channel):
-        return original_can_watch(self, channel) or self.point_farming.can_farm(channel)
+        farmer = self.point_farming
+        return farmer.stream_available(channel) and (
+            original_can_watch(self, channel) or farmer.can_farm(channel)
+        )
 
     def priority(self, channel):
         farmer = self.point_farming
@@ -384,7 +404,13 @@ def install(twitch_cls):
         farmer = getattr(channel._twitch, "point_farming", None)
         if farmer is not None and not channel._twitch.can_watch(channel):
             return False
+        stream = channel._stream
         succeeded = await original_send(channel)
+        if farmer is not None and stream is not None and stream.playback_unavailable:
+            # Discovery can report the ended broadcast as live for several minutes.
+            farmer.unavailable_streams[channel.id] = (
+                stream.broadcast_id, monotonic() + UNAVAILABLE_STREAM_RETRY
+            )
         if succeeded and farmer is not None:
             await farmer.minute(channel)
         return succeeded
