@@ -18,6 +18,12 @@ Notification credentials are stored in `config/notifications.json`. The applicat
 
 The server image is published to `ghcr.io/norsknoobing/twitchdropsminer` for AMD64 and ARM64. Version tags follow the upstream version with a fork revision suffix, for example `16.dev.ca05c8c-notify.1`; `latest` points to the newest tested release.
 
+## Fork automation
+
+This fork validates language files and runs the Python tests on changes. Container CI separately checks the AMD64 runtime, browser login and dependency security. Publish Container builds and signs the AMD64/ARM64 server image on a release or manual request. The daily upstream sync runs tests and a smoke build only when a new upstream release is available.
+
+Desktop executable packaging and the rolling development-binary release are not built by this fork. The desktop downloads described below belong to upstream.
+
 ### Fork Modifications:
 - **Web UI** - Added a browser-based interface via NiceGUI, accessible from any device on your network — see [webui/README.md](webui/README.md)
 - **Console logging** - Added `--stdlog` command line option to output logs to stdout/stderr
