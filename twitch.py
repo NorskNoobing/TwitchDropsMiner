@@ -1005,9 +1005,8 @@ class Twitch:
                             {"channelID": str(channel.id)}
                         )
                     )
-                    drop_data: JsonType | None = (
-                        context["data"]["currentUser"]["dropCurrentSession"]
-                    )
+                    current_user = (context.get("data") or {}).get("currentUser")
+                    drop_data: JsonType | None = (current_user or {}).get("dropCurrentSession")
                 except GQLException:
                     drop_data = None
                 if drop_data is not None:
@@ -1274,9 +1273,8 @@ class Twitch:
                             {"channelID": str(watching_channel.id)}
                         )
                     )
-                    drop_data: JsonType | None = (
-                        context["data"]["currentUser"]["dropCurrentSession"]
-                    )
+                    current_user = (context.get("data") or {}).get("currentUser")
+                    drop_data: JsonType | None = (current_user or {}).get("dropCurrentSession")
                     if drop_data is None or drop_data["dropID"] != drop.id:
                         break
                     await asyncio.sleep(2)
