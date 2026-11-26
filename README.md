@@ -22,6 +22,8 @@ The server image is published to `ghcr.io/norsknoobing/twitchdropsminer` for AMD
 
 This fork validates language files and runs the Python tests on changes. Container CI separately checks the AMD64 runtime, browser login and dependency security. Publish Container builds and signs the AMD64/ARM64 server image on a release or manual request. The daily upstream sync runs tests and a smoke build only when a new upstream release is available.
 
+Before merging an upstream release, synchronization stops for maintainer review if upstream changed `.github/workflows/` or the workflow guard itself. Ordinary application updates continue through the existing tests and container smoke build. After reviewing the upstream workflow changes, merge the approved result into `webui` manually and rerun synchronization; there is no automatic bypass.
+
 Desktop executable packaging and the rolling development-binary release are not built by this fork. The desktop downloads described below belong to upstream.
 
 ### Fork Modifications:
